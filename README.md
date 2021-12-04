@@ -1,6 +1,8 @@
 # Pi - VST3 plug-in example in Rust
 
-A simple sine synth written in Rust.
+A simple sine synth written in Rust. This repository folked from [SoyBoy SP](https://github.com/t-sin/soyboy-sp.vst3).
+
+![Screenshot](screenshot.png)
 
 ## Author
 
