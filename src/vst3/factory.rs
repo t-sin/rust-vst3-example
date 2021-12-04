@@ -9,24 +9,24 @@ use vst3_sys::{
     VST3,
 };
 
-use crate::soyboy::parameters;
+use crate::pi::parameters;
 use crate::vst3::{
-    controller::SoyBoyController,
-    plugin::SoyBoyPlugin,
+    controller::PiSynthController,
+    plugin::PiSynthPlugin,
     plugin_data,
     utils::{strcpy, wstrcpy},
 };
 
 #[VST3(implements(IPluginFactory3))]
-pub struct SoyBoyPluginFactory {}
+pub struct PiSynthPluginFactory {}
 
-impl SoyBoyPluginFactory {
+impl PiSynthPluginFactory {
     pub fn new() -> Box<Self> {
         Self::allocate()
     }
 }
 
-impl IPluginFactory for SoyBoyPluginFactory {
+impl IPluginFactory for PiSynthPluginFactory {
     unsafe fn get_factory_info(&self, info: *mut PFactoryInfo) -> tresult {
         let info = &mut *info;
 
@@ -49,7 +49,7 @@ impl IPluginFactory for SoyBoyPluginFactory {
                 let info = &mut *info;
 
                 info.cardinality = 0x7FFF_FFFF;
-                info.cid = SoyBoyPlugin::CID;
+                info.cid = PiSynthPlugin::CID;
 
                 strcpy(plugin_data::VST3_CLASS_NAME, info.name.as_mut_ptr());
                 strcpy(plugin_data::VST3_CLASS_CATEGORY, info.category.as_mut_ptr());
@@ -61,7 +61,7 @@ impl IPluginFactory for SoyBoyPluginFactory {
                 let info = &mut *info;
 
                 info.cardinality = 0x7FFF_FFFF;
-                info.cid = SoyBoyController::CID;
+                info.cid = PiSynthController::CID;
 
                 strcpy(
                     plugin_data::VST3_CONTROLLER_CLASS_NAME,
@@ -92,14 +92,14 @@ impl IPluginFactory for SoyBoyPluginFactory {
         let param_info = parameters::make_parameter_info();
 
         match iid {
-            SoyBoyPlugin::CID => {
-                let ptr = Box::into_raw(SoyBoyPlugin::new(param_info)) as *mut c_void;
+            PiSynthPlugin::CID => {
+                let ptr = Box::into_raw(PiSynthPlugin::new(param_info)) as *mut c_void;
                 *obj = ptr;
 
                 kResultOk
             }
-            SoyBoyController::CID => {
-                let ptr = Box::into_raw(SoyBoyController::new(param_info)) as *mut c_void;
+            PiSynthController::CID => {
+                let ptr = Box::into_raw(PiSynthController::new(param_info)) as *mut c_void;
                 *obj = ptr;
 
                 kResultOk
@@ -109,7 +109,7 @@ impl IPluginFactory for SoyBoyPluginFactory {
     }
 }
 
-impl IPluginFactory2 for SoyBoyPluginFactory {
+impl IPluginFactory2 for PiSynthPluginFactory {
     unsafe fn get_class_info2(&self, idx: i32, info: *mut PClassInfo2) -> tresult {
         match idx {
             0 => {
@@ -153,7 +153,7 @@ impl IPluginFactory2 for SoyBoyPluginFactory {
     }
 }
 
-impl IPluginFactory3 for SoyBoyPluginFactory {
+impl IPluginFactory3 for PiSynthPluginFactory {
     unsafe fn get_class_info_unicode(&self, idx: i32, info: *mut PClassInfoW) -> tresult {
         match idx {
             0 => {

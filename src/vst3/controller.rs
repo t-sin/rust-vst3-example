@@ -14,23 +14,23 @@ use vst3_sys::{
     },
     utils::VstPtr,
     vst::{
-        kRootUnitId, CtrlNumber, IEditController, IMidiMapping, IUnitInfo, ParamID, ParameterFlags,
-        ParameterInfo, ProgramListInfo, TChar, UnitInfo,
+        kRootUnitId, IEditController, IUnitInfo, ParameterFlags, ParameterInfo, ProgramListInfo,
+        TChar, UnitInfo,
     },
     ComPtr, VST3,
 };
 
-use crate::soyboy::parameters::{Normalizable, Parameter, SoyBoyParameter};
+use crate::pi::parameters::{Normalizable, Parameter, PiParameter};
 use crate::vst3::{plugin_data, utils};
 
-#[VST3(implements(IEditController, IUnitInfo, IMidiMapping))]
-pub struct SoyBoyController {
-    soyboy_params: HashMap<Parameter, SoyBoyParameter>,
+#[VST3(implements(IEditController, IUnitInfo))]
+pub struct PiSynthController {
+    pi_params: HashMap<Parameter, PiParameter>,
     vst3_params: RefCell<HashMap<u32, ParameterInfo>>,
     param_values: RefCell<HashMap<u32, f64>>,
 }
 
-impl SoyBoyController {
+impl PiSynthController {
     pub const CID: GUID = GUID {
         data: plugin_data::VST3_CONTROLLER_CID,
     };
@@ -62,25 +62,25 @@ impl SoyBoyController {
         (*param_vals).insert(id, param.default_normalized_value);
     }
 
-    pub unsafe fn new(soyboy_params: HashMap<Parameter, SoyBoyParameter>) -> Box<SoyBoyController> {
+    pub unsafe fn new(pi_params: HashMap<Parameter, PiParameter>) -> Box<PiSynthController> {
         let vst3_params = RefCell::new(HashMap::new());
         let param_vals = RefCell::new(HashMap::new());
 
-        SoyBoyController::allocate(soyboy_params, vst3_params, param_vals)
+        PiSynthController::allocate(pi_params, vst3_params, param_vals)
     }
 }
 
-impl IPluginBase for SoyBoyController {
+impl IPluginBase for PiSynthController {
     unsafe fn initialize(&self, _host_context: *mut c_void) -> tresult {
-        let soyboy_params = self.soyboy_params.clone();
-        for (param, soyboy_param) in soyboy_params.iter() {
+        let pi_params = self.pi_params.clone();
+        for (param, pi_param) in pi_params.iter() {
             self.add_parameter(
                 *param as u32,
-                &soyboy_param.title,
-                &soyboy_param.short_title,
-                &soyboy_param.unit_name,
-                soyboy_param.step_count,
-                soyboy_param.default_value,
+                &pi_param.title,
+                &pi_param.short_title,
+                &pi_param.unit_name,
+                pi_param.step_count,
+                pi_param.default_value,
                 ParameterFlags::kCanAutomate as i32,
             );
         }
@@ -93,29 +93,7 @@ impl IPluginBase for SoyBoyController {
     }
 }
 
-impl IMidiMapping for SoyBoyController {
-    unsafe fn get_midi_controller_assignment(
-        &self,
-        _bus_index: i32,
-        _channel: i16,
-        midi_cc_number: CtrlNumber,
-        param_id: *mut ParamID,
-    ) -> tresult {
-        match midi_cc_number {
-            // kPitchBend
-            // cf.
-            // - https://www.utsbox.com/?p=1109
-            // - https://steinbergmedia.github.io/vst3_doc/vstinterfaces/namespaceSteinberg_1_1Vst.html#a70ee68a13248febed5047cfa0fddf4e6
-            129 => {
-                *param_id = Parameter::PitchBend as u32;
-                kResultTrue
-            }
-            _ => kResultFalse,
-        }
-    }
-}
-
-impl IEditController for SoyBoyController {
+impl IEditController for PiSynthController {
     unsafe fn set_component_state(&self, state: *mut c_void) -> tresult {
         if state.is_null() {
             return kResultFalse;
@@ -168,7 +146,7 @@ impl IEditController for SoyBoyController {
     ) -> tresult {
         match Parameter::try_from(id) {
             Ok(param) => {
-                if let Some(p) = self.soyboy_params.get(&param) {
+                if let Some(p) = self.pi_params.get(&param) {
                     utils::tcharcpy(&p.format(value_normalized), string)
                 } else {
                     return kResultFalse;
@@ -188,7 +166,7 @@ impl IEditController for SoyBoyController {
     ) -> tresult {
         match Parameter::try_from(id) {
             Ok(param) => {
-                if let Some(p) = self.soyboy_params.get(&param) {
+                if let Some(p) = self.pi_params.get(&param) {
                     if let Some(v) = p.parse(&utils::tchar_to_string(string)) {
                         *value_normalized = v;
                     } else {
@@ -206,7 +184,7 @@ impl IEditController for SoyBoyController {
     unsafe fn normalized_param_to_plain(&self, id: u32, value_normalized: f64) -> f64 {
         match Parameter::try_from(id) {
             Ok(param) => {
-                if let Some(p) = self.soyboy_params.get(&param) {
+                if let Some(p) = self.pi_params.get(&param) {
                     p.denormalize(value_normalized)
                 } else {
                     0.0
@@ -219,7 +197,7 @@ impl IEditController for SoyBoyController {
     unsafe fn plain_param_to_normalized(&self, id: u32, value_plain: f64) -> f64 {
         match Parameter::try_from(id) {
             Ok(param) => {
-                if let Some(p) = self.soyboy_params.get(&param) {
+                if let Some(p) = self.pi_params.get(&param) {
                     p.normalize(value_plain)
                 } else {
                     0.0
@@ -252,7 +230,7 @@ impl IEditController for SoyBoyController {
     }
 }
 
-impl IUnitInfo for SoyBoyController {
+impl IUnitInfo for PiSynthController {
     unsafe fn get_unit_count(&self) -> i32 {
         1
     }

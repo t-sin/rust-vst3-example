@@ -19,22 +19,22 @@ use vst3_sys::{
     ComPtr, VST3,
 };
 
-use crate::soyboy::{
+use crate::pi::{
     event::{Event, Triggered},
-    parameters::{Normalizable, Parameter, Parametric, SoyBoyParameter},
-    AudioProcessor, SoyBoy,
+    parameters::{Normalizable, Parameter, Parametric, PiParameter},
+    AudioProcessor, PiSynth,
 };
-use crate::vst3::{controller::SoyBoyController, plugin_data, utils};
+use crate::vst3::{controller::PiSynthController, plugin_data, utils};
 
 #[VST3(implements(IComponent, IAudioProcessor))]
-pub struct SoyBoyPlugin {
-    soyboy: RefCell<SoyBoy>,
-    params: HashMap<Parameter, SoyBoyParameter>,
+pub struct PiSynthPlugin {
+    pi: RefCell<PiSynth>,
+    params: HashMap<Parameter, PiParameter>,
     audio_out: RefCell<BusInfo>,
     event_in: RefCell<BusInfo>,
 }
 
-impl SoyBoyPlugin {
+impl PiSynthPlugin {
     pub const CID: GUID = GUID {
         data: plugin_data::VST3_CID,
     };
@@ -61,12 +61,12 @@ impl SoyBoyPlugin {
         bus.flags = BusFlags::kDefaultActive as u32;
     }
 
-    pub unsafe fn new(params: HashMap<Parameter, SoyBoyParameter>) -> Box<Self> {
-        let soyboy = RefCell::new(SoyBoy::new());
+    pub unsafe fn new(params: HashMap<Parameter, PiParameter>) -> Box<Self> {
+        let pi = RefCell::new(PiSynth::new());
         let audio_out = RefCell::new(utils::make_empty_bus_info());
         let event_in = RefCell::new(utils::make_empty_bus_info());
 
-        SoyBoyPlugin::allocate(soyboy, params, audio_out, event_in)
+        PiSynthPlugin::allocate(pi, params, audio_out, event_in)
     }
 
     pub fn bus_count(&self, media_type: MediaTypes, dir: BusDirections) -> i32 {
@@ -84,9 +84,9 @@ impl SoyBoyPlugin {
     }
 }
 
-impl IPluginBase for SoyBoyPlugin {
+impl IPluginBase for PiSynthPlugin {
     unsafe fn initialize(&self, _host_context: *mut c_void) -> tresult {
-        let mut sb = self.soyboy.borrow_mut();
+        let mut sb = self.pi.borrow_mut();
         for param in Parameter::iter() {
             if let Some(sp) = self.params.get(&param) {
                 sb.set_param(&param, sp.default_value);
@@ -104,9 +104,9 @@ impl IPluginBase for SoyBoyPlugin {
     }
 }
 
-impl IComponent for SoyBoyPlugin {
+impl IComponent for PiSynthPlugin {
     unsafe fn get_controller_class_id(&self, tuid: *mut IID) -> tresult {
-        *tuid = SoyBoyController::CID;
+        *tuid = PiSynthController::CID;
 
         kResultOk
     }
@@ -208,8 +208,8 @@ impl IComponent for SoyBoyPlugin {
 
                 state.read(ptr, mem::size_of::<f64>() as i32, &mut num_bytes_read);
 
-                let mut soyboy = self.soyboy.borrow_mut();
-                soyboy.set_param(&param, p.denormalize(value));
+                let mut pi = self.pi.borrow_mut();
+                pi.set_param(&param, p.denormalize(value));
             } else {
                 return kResultFalse;
             }
@@ -229,7 +229,7 @@ impl IComponent for SoyBoyPlugin {
         let mut num_bytes_written = 0;
         for param in Parameter::iter() {
             if let Some(p) = self.params.get(&param) {
-                let value = self.soyboy.borrow().get_param(&param);
+                let value = self.pi.borrow().get_param(&param);
 
                 let mut value = p.normalize(value);
                 let ptr = &mut value as *mut f64 as *mut c_void;
@@ -243,7 +243,7 @@ impl IComponent for SoyBoyPlugin {
     }
 }
 
-impl IAudioProcessor for SoyBoyPlugin {
+impl IAudioProcessor for PiSynthPlugin {
     unsafe fn set_bus_arrangements(
         &self,
         _inputs: *mut u64,
@@ -315,9 +315,7 @@ impl IAudioProcessor for SoyBoyPlugin {
                             ) == kResultTrue
                             {
                                 if let Some(p) = self.params.get(&param) {
-                                    self.soyboy
-                                        .borrow_mut()
-                                        .set_param(&param, p.denormalize(value));
+                                    self.pi.borrow_mut().set_param(&param, p.denormalize(value));
                                 }
                             }
                         }
@@ -336,13 +334,13 @@ impl IAudioProcessor for SoyBoyPlugin {
                 let mut e = utils::make_empty_event();
 
                 if input_events.get_event(c, &mut e) == kResultOk {
-                    let mut soyboy = self.soyboy.borrow_mut();
+                    let mut pi = self.pi.borrow_mut();
                     match utils::as_event_type(e.type_) {
-                        Some(EventTypes::kNoteOnEvent) => soyboy.trigger(&Event::NoteOn {
+                        Some(EventTypes::kNoteOnEvent) => pi.trigger(&Event::NoteOn {
                             note: e.event.note_on.pitch as u16,
                             velocity: e.event.note_on.velocity as f64,
                         }),
-                        Some(EventTypes::kNoteOffEvent) => soyboy.trigger(&Event::NoteOff {
+                        Some(EventTypes::kNoteOffEvent) => pi.trigger(&Event::NoteOff {
                             note: e.event.note_off.pitch as u16,
                         }),
                         Some(_) => (),
@@ -364,7 +362,7 @@ impl IAudioProcessor for SoyBoyPlugin {
         match data.symbolic_sample_size {
             K_SAMPLE32 => {
                 for n in 0..num_samples as isize {
-                    let s = self.soyboy.borrow_mut().process(sample_rate);
+                    let s = self.pi.borrow_mut().process(sample_rate);
 
                     for i in 0..num_output_channels as isize {
                         let ch_out = *out.offset(i) as *mut f32;
@@ -376,7 +374,7 @@ impl IAudioProcessor for SoyBoyPlugin {
             }
             K_SAMPLE64 => {
                 for n in 0..num_samples as isize {
-                    let s = self.soyboy.borrow_mut().process(sample_rate);
+                    let s = self.pi.borrow_mut().process(sample_rate);
 
                     for i in 0..num_output_channels as isize {
                         let ch_out = *out.offset(i) as *mut f64;
